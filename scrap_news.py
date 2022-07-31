@@ -8,11 +8,44 @@ import pandas as pd
 import math
 from multiprocessing import Pool
 
+from bs4 import BeautifulSoup
+import requests
 
-POOLS_NUMBER = 6
+
+POOLS_NUMBER = 15
 pools_count = 300
 START_DATE = datetime.datetime(2014, 1, 1)
 END_DATE = datetime.datetime.today() + datetime.timedelta(days=-1)
+
+
+
+def get_ria_news_bs(news_link):
+    date_text_news_row = {}
+    page = requests.get(news_link)
+    soup = BeautifulSoup(page.text, "html.parser")
+    try:
+        date_text_news_row.update({
+            'date': soup.find('div', class_='article__info-date').text,
+            'link': news_link,
+            'header': soup.find('div', class_ = 'article__title').text,
+            'text': soup.find('div', class_ = 'article__body js-mediator-article mia-analytics').text
+            })
+    except selenium.common.exceptions.NoSuchElementException:
+        date_text_news_row.update({
+            'date': '',
+            'link': news_link,
+            'header': '',
+            'text': soup.find('div', class_ = 'article__body js-mediator-article mia-analytics').text
+            })
+    except AttributeError:
+        date_text_news_row.update({
+            'date': soup.find('div', class_='article__info-date').text,
+            'link': news_link,
+            'header': soup.find('h1', class_ = 'article__title').text,
+            'text': soup.find('div', class_ = 'article__body js-mediator-article mia-analytics').text
+            })
+    date_text_news_row = pd.DataFrame(date_text_news_row, index=[0])
+    return date_text_news_row
 
 
 def get_ria_news(driver, news_link):
@@ -45,6 +78,7 @@ def ria_news(date_links):
         except selenium.common.exceptions.NoSuchElementException:
             continue
         for i in range (0, 30):
+            print(date_, ' --- ', i)
             driver.execute_script("arguments[0].click();", more_button)
             time.sleep(.5)
         links = []
@@ -58,12 +92,12 @@ def ria_news(date_links):
             if date_ in link:
                 if 'sport' not in link:
                     print(k, ' --- ', len(set(links)), ' --- ', link)
-                    news_of_date = get_ria_news(driver, link)
+                    # news_of_date = get_ria_news(driver, link)
+                    news_of_date = get_ria_news_bs(link)
                     news_of_dates = pd.concat([news_of_dates, news_of_date], sort=False)
                     k += 1
-        news_of_dates.to_excel(r'C:\Users\marat\OneDrive\Рабочий стол\scap_news\ria_news\news_text_set_' + date_ + '.xlsx', index=False)
+        news_of_dates.to_excel(r'C:\Users\marat\OneDrive\Рабочий стол\scap_news\ria_news_bs\news_text_set_' + date_ + '.xlsx', index=False)
     driver.close()
-
 
 def ria():
     dates = []
